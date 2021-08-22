@@ -479,7 +479,7 @@ static int const RCTVideoUnset = -1;
     DebugLog(@"Could not find video URL in source '%@'", source);
     return;
   }
-  else if ([uri containsString:@"/Documents/"]) {
+  else if ([uri containsString:@"file://"] && [uri containsString:@"/Documents/"]) {
       
       NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
       NSString* relativeFilePath = [uri lastPathComponent];
