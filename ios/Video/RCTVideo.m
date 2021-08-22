@@ -479,6 +479,21 @@ static int const RCTVideoUnset = -1;
     DebugLog(@"Could not find video URL in source '%@'", source);
     return;
   }
+  else if ([uri containsString:@"/Documents/"]) {
+      
+      NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
+      NSString* relativeFilePath = [uri lastPathComponent];
+      // the file may be multiple levels below the documents directory
+      NSArray* fileComponents = [uri componentsSeparatedByString:@"Documents/"];
+      if (fileComponents.count > 1) {
+        relativeFilePath = [fileComponents objectAtIndex:1];
+      }
+      
+      NSString *path = [paths.firstObject stringByAppendingPathComponent:relativeFilePath];
+      uri = [NSString stringWithFormat:@"file:///%@", path];
+  }
+    
+    NSLog(@"%@", uri);
 
   NSURL *url = isNetwork || isAsset
     ? [NSURL URLWithString:uri]
