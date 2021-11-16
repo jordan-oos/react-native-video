@@ -36,8 +36,6 @@ static int const RCTVideoUnset = -1;
   
   /* Required to publish events */
   RCTEventDispatcher *_eventDispatcher;
-  BOOL _playbackRateObserverRegistered;
-  BOOL _isExternalPlaybackActiveObserverRegistered;
   BOOL _videoLoadStarted;
   
   bool _pendingSeek;
@@ -88,8 +86,6 @@ static int const RCTVideoUnset = -1;
   if ((self = [super init])) {
     _eventDispatcher = eventDispatcher;
     
-    _playbackRateObserverRegistered = NO;
-    _isExternalPlaybackActiveObserverRegistered = NO;
     _playbackStalled = NO;
     _rate = 1.0;
     _volume = 1.0;
@@ -357,23 +353,17 @@ static int const RCTVideoUnset = -1;
       
       [_player pause];
         
-      if (_playbackRateObserverRegistered) {
-        [_player removeObserver:self forKeyPath:playbackRate context:nil];
-        _playbackRateObserverRegistered = NO;
-      }
-      if (_isExternalPlaybackActiveObserverRegistered) {
-        [_player removeObserver:self forKeyPath:externalPlaybackActive context:nil];
-        _isExternalPlaybackActiveObserverRegistered = NO;
-      }
-        
       _player = [AVPlayer playerWithPlayerItem:_playerItem];
       _player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
         
+      @try {
+        [_player removeObserver:self forKeyPath:playbackRate context:nil];
+      } @catch (id exception) {}
+      @try {
+        [_player removeObserver:self forKeyPath:externalPlaybackActive context:nil];
+      } @catch (id exception) {}
       [_player addObserver:self forKeyPath:playbackRate options:0 context:nil];
-      _playbackRateObserverRegistered = YES;
-      
       [_player addObserver:self forKeyPath:externalPlaybackActive options:0 context:nil];
-      _isExternalPlaybackActiveObserverRegistered = YES;
         
       [self addPlayerTimeObserver];
 
@@ -593,7 +583,6 @@ static int const RCTVideoUnset = -1;
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
 {
-
   if([keyPath isEqualToString:readyForDisplayKeyPath] && [change objectForKey:NSKeyValueChangeNewKey] && self.onReadyForDisplay) {
     self.onReadyForDisplay(@{@"target": self.reactTag});
     return;
@@ -1335,6 +1324,13 @@ static int const RCTVideoUnset = -1;
       [self addSubview:_playerViewController.view];
     }
       
+      @try {
+          [_playerViewController removeObserver:self forKeyPath:readyForDisplayKeyPath];
+          [_playerViewController.contentOverlayView removeObserver:self forKeyPath:@"frame"];
+      }
+      @catch (id anException) {
+      }
+
     [_playerViewController addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
     
     [_playerViewController.contentOverlayView addObserver:self forKeyPath:@"frame" options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:NULL];
@@ -1352,6 +1348,13 @@ static int const RCTVideoUnset = -1;
     // to prevent video from being animated when resizeMode is 'cover'
     // resize mode must be set before layer is added
     [self setResizeMode:_resizeMode];
+      
+      @try {
+          [_playerViewController removeObserver:self forKeyPath:readyForDisplayKeyPath];
+      }
+      @catch (id anException) {
+      }
+
     [_playerLayer addObserver:self forKeyPath:readyForDisplayKeyPath options:NSKeyValueObservingOptionNew context:nil];
     _playerLayerObserverSet = YES;
     
@@ -1408,12 +1411,14 @@ static int const RCTVideoUnset = -1;
 {
   if (_playerViewController == playerViewController && _fullscreenPlayerPresented && self.onVideoFullscreenPlayerWillDismiss)
   {
+    self.onVideoFullscreenPlayerWillDismiss(@{@"target": self.reactTag});
     @try{
       [_playerViewController.contentOverlayView removeObserver:self forKeyPath:@"frame"];
       [_playerViewController removeObserver:self forKeyPath:readyForDisplayKeyPath];
+      [_player removeObserver:self forKeyPath:playbackRate context:nil];
+      [_player removeObserver:self forKeyPath:externalPlaybackActive context:nil];
     }@catch(id anException){
     }
-    self.onVideoFullscreenPlayerWillDismiss(@{@"target": self.reactTag});
   }
 }
 
@@ -1523,14 +1528,13 @@ static int const RCTVideoUnset = -1;
 - (void)removeFromSuperview
 {
   [_player pause];
-  if (_playbackRateObserverRegistered) {
+  @try {
     [_player removeObserver:self forKeyPath:playbackRate context:nil];
-    _playbackRateObserverRegistered = NO;
-  }
-  if (_isExternalPlaybackActiveObserverRegistered) {
+  } @catch (id exception) {}
+  @try {
     [_player removeObserver:self forKeyPath:externalPlaybackActive context:nil];
-    _isExternalPlaybackActiveObserverRegistered = NO;
-  }
+  } @catch (id exception) {}
+  
   _player = nil;
   
   [self removePlayerLayer];
