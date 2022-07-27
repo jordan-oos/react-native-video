@@ -19,11 +19,9 @@ RCT_EXPORT_MODULE();
 }
 
 RCT_EXPORT_VIEW_PROPERTY(src, NSDictionary);
-RCT_EXPORT_VIEW_PROPERTY(drm, NSDictionary);
 RCT_EXPORT_VIEW_PROPERTY(maxBitRate, float);
 RCT_EXPORT_VIEW_PROPERTY(resizeMode, NSString);
 RCT_EXPORT_VIEW_PROPERTY(repeat, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(automaticallyWaitsToMinimizeStalling, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(allowsExternalPlayback, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(textTracks, NSArray);
 RCT_EXPORT_VIEW_PROPERTY(selectedTextTrack, NSDictionary);
@@ -33,12 +31,9 @@ RCT_EXPORT_VIEW_PROPERTY(muted, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(controls, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(volume, float);
 RCT_EXPORT_VIEW_PROPERTY(playInBackground, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(preventsDisplaySleepDuringVideoPlayback, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(preferredForwardBufferDuration, float);
 RCT_EXPORT_VIEW_PROPERTY(playWhenInactive, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(pictureInPicture, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(ignoreSilentSwitch, NSString);
-RCT_EXPORT_VIEW_PROPERTY(mixWithOthers, NSString);
 RCT_EXPORT_VIEW_PROPERTY(rate, float);
 RCT_EXPORT_VIEW_PROPERTY(seek, NSDictionary);
 RCT_EXPORT_VIEW_PROPERTY(currentTime, float);
@@ -58,6 +53,7 @@ RCT_EXPORT_VIEW_PROPERTY(onVideoProgress, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onBandwidthUpdate, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onVideoSeek, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onVideoEnd, RCTDirectEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onCaptionsChanged, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onTimedMetadata, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onVideoAudioBecomingNoisy, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onVideoFullscreenPlayerWillPresent, RCTDirectEventBlock);
@@ -69,7 +65,6 @@ RCT_EXPORT_VIEW_PROPERTY(onPlaybackStalled, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onPlaybackResume, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onPlaybackRateChange, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onVideoExternalPlaybackChange, RCTDirectEventBlock);
-RCT_EXPORT_VIEW_PROPERTY(onGetLicense, RCTDirectEventBlock);
 RCT_REMAP_METHOD(save,
         options:(NSDictionary *)options
         reactTag:(nonnull NSNumber *)reactTag
@@ -84,34 +79,7 @@ RCT_REMAP_METHOD(save,
             [view save:options resolve:resolve reject:reject];
         }
     }];
-};
-RCT_REMAP_METHOD(setLicenseResult,
-         license:(NSString *)license
-         reactTag:(nonnull NSNumber *)reactTag)
-{
-    [self.bridge.uiManager prependUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, RCTVideo *> *viewRegistry) {
-        RCTVideo *view = viewRegistry[reactTag];
-        if (![view isKindOfClass:[RCTVideo class]]) {
-            RCTLogError(@"Invalid view returned from registry, expecting RCTVideo, got: %@", view);
-        } else {
-            [view setLicenseResult:license];
-        }
-    }];
-};
-
-RCT_REMAP_METHOD(setLicenseResultError,
-                 error:(NSString *)error
-                 reactTag:(nonnull NSNumber *)reactTag)
-{
-    [self.bridge.uiManager prependUIBlock:^(__unused RCTUIManager *uiManager, NSDictionary<NSNumber *, RCTVideo *> *viewRegistry) {
-        RCTVideo *view = viewRegistry[reactTag];
-        if (![view isKindOfClass:[RCTVideo class]]) {
-            RCTLogError(@"Invalid view returned from registry, expecting RCTVideo, got: %@", view);
-        } else {
-            [view setLicenseResultError:error];
-        }
-    }];
-};
+}
 RCT_EXPORT_VIEW_PROPERTY(onPictureInPictureStatusChanged, RCTDirectEventBlock);
 RCT_EXPORT_VIEW_PROPERTY(onRestoreUserInterfaceForPictureInPictureStop, RCTDirectEventBlock);
 
