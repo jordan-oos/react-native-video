@@ -34,6 +34,8 @@ static int const RCTVideoUnset = -1;
   RCTVideoPlayerViewController *_playerViewController;
   NSURL *_videoURL;
 
+  UIView *_subview;
+
   /* Required to publish events */
   RCTEventDispatcher *_eventDispatcher;
   BOOL _videoLoadStarted;
@@ -72,6 +74,7 @@ static int const RCTVideoUnset = -1;
   NSString *_filterName;
   BOOL _filterEnabled;
   UIViewController * _presentingViewController;
+  BOOL _isInFullScreen;
 #if __has_include(<react-native-video/RCTVideoCache.h>)
   RCTVideoCache * _videoCache;
 #endif
@@ -142,6 +145,13 @@ static int const RCTVideoUnset = -1;
 
     viewController.view.frame = self.bounds;
     viewController.player = player;
+
+    if (_subview) {
+          [viewController.contentOverlayView addSubview:_subview];
+          viewController.contentOverlayView.frame = self.bounds;
+          _subview.frame = self.bounds;
+        }
+
     return viewController;
 }
 
@@ -708,10 +718,17 @@ static int const RCTVideoUnset = -1;
         if (!CGRectEqualToRect(oldRect, newRect)) {
           if (CGRectEqualToRect(newRect, [UIScreen mainScreen].bounds)) {
             NSLog(@"in fullscreen");
-          } else NSLog(@"not fullscreen");
+            _isInFullScreen = YES;
+          } else{
+           NSLog(@"not fullscreen");
+           _isInFullScreen = NO;
+           }
 
-          [self.reactViewController.view setFrame:[UIScreen mainScreen].bounds];
-          [self.reactViewController.view setNeedsLayout];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+                [self.reactViewController.view setFrame:[UIScreen mainScreen].bounds];
+                [self.reactViewController.view setNeedsLayout];
+          });
         }
 
         return;
@@ -869,11 +886,11 @@ static int const RCTVideoUnset = -1;
 }
 
 - (void)setupPipController {
-  if (!_pipController && _playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
+//   if (!_pipController && _playerLayer && [AVPictureInPictureController isPictureInPictureSupported]) {
     // Create new controller passing reference to the AVPlayerLayer
     _pipController = [[AVPictureInPictureController alloc] initWithPlayerLayer:_playerLayer];
     _pipController.delegate = self;
-  }
+//   }
 }
 #endif
 
@@ -1245,13 +1262,18 @@ static int const RCTVideoUnset = -1;
 }
 
 - (void)setFullscreen:(BOOL) fullscreen {
-  if( fullscreen && !_fullscreenPlayerPresented && _player )
+  if( fullscreen && !_fullscreenPlayerPresented && _player && !_isInFullScreen)
   {
     // Ensure player view controller is not null
     if( !_playerViewController )
     {
       [self usePlayerViewController];
     }
+     if (_controls) {
+          [_playerViewController willMoveToParentViewController:nil];
+          [_playerViewController.view removeFromSuperview];
+          [_playerViewController removeFromParentViewController];
+        }
     // Set presentation style to fullscreen
     [_playerViewController setModalPresentationStyle:UIModalPresentationFullScreen];
 
@@ -1273,7 +1295,7 @@ static int const RCTVideoUnset = -1;
         self.onVideoFullscreenPlayerWillPresent(@{@"target": self.reactTag});
       }
       if (!_playerViewController.isBeingPresented) {
-        [viewController presentViewController:_playerViewController animated:true completion:^{
+        [viewController presentViewController:_playerViewController animated:false completion:^{
           _playerViewController.showsPlaybackControls = YES;
           _fullscreenPlayerPresented = fullscreen;
           _playerViewController.autorotate = _fullscreenAutorotate;
@@ -1287,7 +1309,7 @@ static int const RCTVideoUnset = -1;
   else if ( !fullscreen && _fullscreenPlayerPresented )
   {
     [self videoPlayerViewControllerWillDismiss:_playerViewController];
-    [_presentingViewController dismissViewControllerAnimated:true completion:^{
+    [_playerViewController dismissViewControllerAnimated:NO completion:^{
       [self videoPlayerViewControllerDidDismiss:_playerViewController];
     }];
   }
@@ -1322,6 +1344,7 @@ static int const RCTVideoUnset = -1;
       UIViewController *viewController = [self reactViewController];
       [viewController addChildViewController:_playerViewController];
       [self addSubview:_playerViewController.view];
+      [_playerViewController didMoveToParentViewController:viewController];
     }
 
       @try {
@@ -1339,8 +1362,7 @@ static int const RCTVideoUnset = -1;
 
 - (void)usePlayerLayer
 {
-  if( _player )
-  {
+
     _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
     _playerLayer.frame = self.bounds;
     _playerLayer.needsDisplayOnBoundsChange = YES;
@@ -1363,7 +1385,7 @@ static int const RCTVideoUnset = -1;
     #if TARGET_OS_IOS
     [self setupPipController];
     #endif
-  }
+
 }
 
 - (void)setControls:(BOOL)controls
@@ -1412,13 +1434,6 @@ static int const RCTVideoUnset = -1;
   if (_playerViewController == playerViewController && _fullscreenPlayerPresented && self.onVideoFullscreenPlayerWillDismiss)
   {
     self.onVideoFullscreenPlayerWillDismiss(@{@"target": self.reactTag});
-    @try{
-      [_playerViewController.contentOverlayView removeObserver:self forKeyPath:@"frame"];
-      [_playerViewController removeObserver:self forKeyPath:readyForDisplayKeyPath];
-      [_player removeObserver:self forKeyPath:playbackRate context:nil];
-      [_player removeObserver:self forKeyPath:externalPlaybackActive context:nil];
-    }@catch(id anException){
-    }
   }
 }
 
@@ -1428,8 +1443,20 @@ static int const RCTVideoUnset = -1;
   {
     _fullscreenPlayerPresented = false;
     _presentingViewController = nil;
-    _playerViewController = nil;
+    if (_controls && [_fullscreenOrientation isEqualToString:@"all"]) {
+          UIViewController *viewController = [self reactViewController];
+          [viewController addChildViewController:_playerViewController];
+          [self addSubview:_playerViewController.view];
+          [_playerViewController didMoveToParentViewController:viewController];
+        } else {
+          // #1827 Fix playerviewcontroller keypath leak of observers
+          [_playerViewController.contentOverlayView removeObserver:self forKeyPath:@"frame"];
+          [_playerViewController removeObserver:self forKeyPath:readyForDisplayKeyPath];
+          _playerViewController = nil;
+        }
+
     [self applyModifiers];
+    _isInFullScreen = NO;
     if(self.onVideoFullscreenPlayerDidDismiss) {
       self.onVideoFullscreenPlayerDidDismiss(@{@"target": self.reactTag});
     }
@@ -1470,6 +1497,7 @@ static int const RCTVideoUnset = -1;
 
 - (void)insertReactSubview:(UIView *)view atIndex:(NSInteger)atIndex
 {
+    _subview = view;
   // We are early in the game and somebody wants to set a subview.
   // That can only be in the context of playerViewController.
   if( !_controls && !_playerLayer && !_playerViewController )
@@ -1481,6 +1509,8 @@ static int const RCTVideoUnset = -1;
   {
     view.frame = self.bounds;
     [_playerViewController.contentOverlayView insertSubview:view atIndex:atIndex];
+    _playerViewController.contentOverlayView.frame = self.bounds;
+    _subview.frame = self.bounds;
   }
   else
   {
